@@ -34,27 +34,21 @@ from lisp.core.util import compose_url
 from lisp.ui.mainwindow import MainStatusBar
 
 from .status_bar_widget import StatusBarWidget
+from .util import StatusEnum
 
 logger = logging.getLogger(__name__) # pylint: disable=invalid-name
 
 SCHEME = "http"
 
-class SinkStatusLevel(enum.Enum):
-    UNKNOWN = -2
-    DEBUG = -1
-    NORMAL = 0
-    WARNING = 1
-    ERROR = 2
-
 SINK_FLAGS = {
-    "rtp_seq_id_error": SinkStatusLevel.ERROR,
-    "rtp_ssrc_error": SinkStatusLevel.ERROR,
-    "rtp_payload_type_error": SinkStatusLevel.ERROR,
-    "rtp_sac_error": SinkStatusLevel.ERROR,
-    "receiving_rtp_packet": SinkStatusLevel.NORMAL,
-    "some_muted": SinkStatusLevel.DEBUG,
-    "all_muted": SinkStatusLevel.DEBUG,
-    "muted": SinkStatusLevel.NORMAL,
+    "rtp_seq_id_error": StatusEnum.ERROR,
+    "rtp_ssrc_error": StatusEnum.ERROR,
+    "rtp_payload_type_error": StatusEnum.ERROR,
+    "rtp_sac_error": StatusEnum.ERROR,
+    "receiving_rtp_packet": StatusEnum.NORMAL,
+    "some_muted": StatusEnum.DEBUG,
+    "all_muted": StatusEnum.DEBUG,
+    "muted": StatusEnum.NORMAL,
 }
 
 class Aes67Monitor(Plugin):
@@ -102,11 +96,12 @@ class Aes67Monitor(Plugin):
             reply = requests.get(url)
         except requests.ConnectionError:
             return False
+
         return {
-            'locked': 'PTP OK',
-            'unlocked': 'No PTP Master',
-            'locking': 'Connecting',
-        }.get(reply.json()['status'], '??')
+            'locked': StatusEnum.NORMAL,
+            'unlocked': StatusEnum.ERROR,
+            'locking': StatusEnum.WARNING,
+        }.get(reply.json()['status'])
 
     def fetch_sink_status(self):
         url = compose_url(SCHEME, self.ip, self.port, "/api/sinks")
@@ -115,37 +110,33 @@ class Aes67Monitor(Plugin):
         except requests.ConnectionError:
             return False
 
-        overall_status = SinkStatusLevel.NORMAL
+        overall_status = StatusEnum.NORMAL
         sinks = reply.json()['sinks']
         for sink in sinks:
             sink_url = compose_url(SCHEME, self.ip, self.port, f"/api/sink/status/{sink['id']}")
             sink_reply = requests.get(sink_url)
 
             for flag_name, flag_value in sink_reply.json()['sink_flags'].items():
-                level = SINK_FLAGS.get(flag_name, SinkStatusLevel.UNKNOWN)
+                level = SINK_FLAGS.get(flag_name, StatusEnum.UNKNOWN)
 
-                if level == SinkStatusLevel.UNKNOWN:
+                if level == StatusEnum.UNKNOWN:
                     logger.debug(f"Unrecognised flag: {flag_name}")
                     continue
 
-                if not flag_value or level == SinkStatusLevel.NORMAL:
+                if not flag_value or level == StatusEnum.NORMAL:
                     continue
 
-                if level == SinkStatusLevel.ERROR:
+                if level == StatusEnum.ERROR:
                     # .warning instead of .error, as the latter causes a dialog box to appear
                     logger.warning(f"{sink['id']} ({sink['name']}) : {flag_name}")
-                    overall_status = SinkStatusLevel.ERROR
+                    overall_status = StatusEnum.ERROR
 
-                elif level == SinkStatusLevel.WARNING:
+                elif level == StatusEnum.WARNING:
                     logger.warning(f"{sink['id']} ({sink['name']}) : {flag_name}")
-                    if overall_status != SinkStatusLevel.ERROR:
-                        overall_status = SinkStatusLevel.WARNING
+                    if overall_status != StatusEnum.ERROR:
+                        overall_status = StatusEnum.WARNING
 
-                elif level == SinkStatusLevel.DEBUG:
+                elif level == StatusEnum.DEBUG:
                     logger.debug(f"{sink['id']} ({sink['name']}) : {flag_name}")
 
-        if overall_status == SinkStatusLevel.ERROR:
-            return 'Sink Error'
-        if overall_status == SinkStatusLevel.WARNING:
-            return 'Sink Warning'
-        return 'Sinks OK'
+        return overall_status

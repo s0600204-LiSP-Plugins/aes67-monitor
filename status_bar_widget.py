@@ -25,7 +25,13 @@
 # pylint: disable=no-name-in-module
 from PyQt5.QtWidgets import QHBoxLayout, QLabel, QSizePolicy, QWidget
 
+from lisp.ui.icons import IconTheme
+
+from .util import StatusEnum
+
 class StatusBarWidget(QWidget):
+
+    ICON_SIZE = 12
 
     def __init__(self, parent):
         super().__init__(parent=parent)
@@ -41,31 +47,41 @@ class StatusBarWidget(QWidget):
         self._title.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.layout().addWidget(self._title)
 
-        self._disconnect_caption = QLabel(parent=self)
-        self._disconnect_caption.setText("Unable to Connect")
-        self._disconnect_caption.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        self.layout().addWidget(self._disconnect_caption)
+        self._ptp_icon = StatusIcon(self.ICON_SIZE, parent=self)
+        self.layout().addWidget(self._ptp_icon)
 
-        self._ptp_caption = QLabel(parent=self)
-        self._ptp_caption.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        self.layout().addWidget(self._ptp_caption)
-
-        self._sinks_caption = QLabel(parent=self)
-        self._sinks_caption.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        self.layout().addWidget(self._sinks_caption)
-
-        self.clear()
+        self._sinks_icon = StatusIcon(self.ICON_SIZE, parent=self)
+        self.layout().addWidget(self._sinks_icon)
 
     def update(self, *_, ptp=None, sinks=None):
-        self._disconnect_caption.setVisible(False)
         if ptp:
-            self._ptp_caption.setText(ptp)
-            self._ptp_caption.setVisible(True)
+            self._ptp_icon.update(ptp)
         if sinks:
-            self._sinks_caption.setText(sinks)
-            self._sinks_caption.setVisible(True)
+            self._sinks_icon.update(sinks)
 
     def clear(self):
-        self._disconnect_caption.setVisible(True)
-        self._ptp_caption.setVisible(False)
-        self._sinks_caption.setVisible(False)
+        self._ptp_icon.update(StatusEnum.UNKNOWN)
+        self._sinks_icon.update(StatusEnum.UNKNOWN)
+
+
+class StatusIcon(QLabel):
+
+    ICON_MAP = {
+        StatusEnum.UNKNOWN: 'led-off',
+        StatusEnum.NORMAL: 'led-running',
+        StatusEnum.WARNING: 'led-pause',
+        StatusEnum.ERROR: 'led-error',
+    }
+
+    def __init__(self, icon_size, parent=None):
+        super().__init__(parent=parent)
+        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self._icon_size = icon_size
+        self.update(StatusEnum.UNKNOWN)
+
+    def update(self, new_status):
+        self.setPixmap(
+            IconTheme.get(
+                self.ICON_MAP.get(new_status)
+            ).pixmap(self._icon_size)
+        )
