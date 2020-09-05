@@ -79,21 +79,22 @@ class Aes67Monitor(Plugin):
         status_layout.layout().insertWidget(status_layout.count() - 2, self.status_bar_widget)
 
     def run_status_update(self):
-        ptp = self.fetch_ptp_status()
+        with requests.Session() as session:
 
-        if not ptp:
-            self.status_bar_widget.clear()
-            return
+            ptp = self.fetch_ptp_status(session)
 
-        sinks=self.fetch_sink_status()
+            if not ptp:
+                self.status_bar_widget.clear()
+                return
 
-        self.status_bar_widget.update(ptp=ptp, sinks=sinks)
+            sinks = self.fetch_sink_status(session)
 
+            self.status_bar_widget.update(ptp=ptp, sinks=sinks)
 
-    def fetch_ptp_status(self):
+    def fetch_ptp_status(self, session):
         url = compose_url(SCHEME, self.ip, self.port, "/api/ptp/status")
         try:
-            reply = requests.get(url)
+            reply = session.get(url)
         except requests.ConnectionError:
             return False
 
@@ -103,10 +104,10 @@ class Aes67Monitor(Plugin):
             'locking': StatusEnum.WARNING,
         }.get(reply.json()['status'])
 
-    def fetch_sink_status(self):
+    def fetch_sink_status(self, session):
         url = compose_url(SCHEME, self.ip, self.port, "/api/sinks")
         try:
-            reply = requests.get(url)
+            reply = session.get(url)
         except requests.ConnectionError:
             return False
 
@@ -114,7 +115,7 @@ class Aes67Monitor(Plugin):
         sinks = reply.json()['sinks']
         for sink in sinks:
             sink_url = compose_url(SCHEME, self.ip, self.port, f"/api/sink/status/{sink['id']}")
-            sink_reply = requests.get(sink_url)
+            sink_reply = session.get(sink_url)
 
             for flag_name, flag_value in sink_reply.json()['sink_flags'].items():
                 level = SINK_FLAGS.get(flag_name, StatusEnum.UNKNOWN)
