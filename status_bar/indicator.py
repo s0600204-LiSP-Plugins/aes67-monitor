@@ -39,14 +39,38 @@ logger = logging.getLogger(__name__) # pylint: disable=invalid-name
 UPDATE_INTERVAL = 2000 # milliseconds
 
 SINK_FLAGS = {
-    "rtp_seq_id_error": StatusEnum.ERROR,
-    "rtp_ssrc_error": StatusEnum.ERROR,
-    "rtp_payload_type_error": StatusEnum.ERROR,
-    "rtp_sac_error": StatusEnum.ERROR,
-    "receiving_rtp_packet": StatusEnum.NORMAL,
-    "some_muted": StatusEnum.DEBUG,
-    "all_muted": StatusEnum.DEBUG,
-    "muted": StatusEnum.NORMAL,
+    "rtp_seq_id_error": {
+        'status': StatusEnum.ERROR,
+        'tooltip': "Incorrect RTP sequence",
+    },
+    "rtp_ssrc_error": {
+        'status': StatusEnum.ERROR,
+        'tooltip': "Received data from unexpected source",
+    },
+    "rtp_payload_type_error": {
+        'status': StatusEnum.ERROR,
+        'tooltip': "Unexpected payload type",
+    },
+    "rtp_sac_error": {
+        'status': StatusEnum.ERROR,
+        'tooltip': "Packet with invalid timestamp",
+    },
+    "receiving_rtp_packet": {
+        'status': StatusEnum.NORMAL,
+        'tooltip': "Receiving Audio",
+    },
+    "some_muted": {
+        'status': StatusEnum.DEBUG,
+        'tooltip': "Unused flag",
+    },
+    "all_muted": {
+        'status': StatusEnum.DEBUG,
+        'tooltip': "Unused flag",
+    },
+    "muted": {
+        'status': StatusEnum.NORMAL,
+        'tooltip': "Audio stream muted",
+    },
 }
 
 
@@ -100,9 +124,18 @@ class StatusBarIndicator:
             return False
 
         return {
-            'locked': StatusEnum.NORMAL,
-            'unlocked': StatusEnum.ERROR,
-            'locking': StatusEnum.WARNING,
+            'locked': {
+                'status': StatusEnum.NORMAL,
+                'tooltip': "Locked",
+            },
+            'unlocked': {
+                'status': StatusEnum.ERROR,
+                'tooltip': "None",
+            },
+            'locking': {
+                'status': StatusEnum.WARNING,
+                'tooltip': "Connecting...",
+            },
         }.get(reply.json()['status'])
 
     def fetch_sink_status(self, session, address):
@@ -112,32 +145,44 @@ class StatusBarIndicator:
             return False
 
         overall_status = StatusEnum.NORMAL
+        overall_tooltip = ""
         sinks = reply.json()['sinks']
         for sink in sinks:
             sink_reply = session.get(address + self.sink_status_api_path + str(sink['id']))
+            sink_tooltip = f"\n#{sink['id']}: {sink['name']}"
 
             for flag_name, flag_value in sink_reply.json()['sink_flags'].items():
                 level = SINK_FLAGS.get(flag_name, StatusEnum.UNKNOWN)
 
                 if level == StatusEnum.UNKNOWN:
-                    logger.debug(f"Unrecognised flag: {flag_name}")
+                    logger.debug(f"Unrecognised flag '{flag_name}' (on Sink #{sink['id']} '{sink['name']}')")
                     continue
 
-                if not flag_value or level == StatusEnum.NORMAL:
+                if not flag_value:
                     continue
 
-                if level == StatusEnum.ERROR:
+                sink_tooltip += f"\n    • {level['tooltip']}"
+
+                if level['status'] == StatusEnum.NORMAL:
+                    continue
+
+                if level['status'] == StatusEnum.ERROR:
                     # .warning instead of .error, as the latter causes a dialog box to appear
-                    logger.warning(f"{sink['id']} ({sink['name']}) : {flag_name}")
+                    logger.warning(f"{level['tooltip']} on Sink #{sink['id']} ('{sink['name']}') [{flag_name}]")
                     overall_status = StatusEnum.ERROR
 
-                elif level == StatusEnum.WARNING:
-                    logger.warning(f"{sink['id']} ({sink['name']}) : {flag_name}")
+                elif level['status'] == StatusEnum.WARNING:
+                    logger.warning(f"{level['tooltip']} on Sink #{sink['id']} ('{sink['name']}') [{flag_name}]")
                     if overall_status != StatusEnum.ERROR:
                         overall_status = StatusEnum.WARNING
 
-                elif level == StatusEnum.DEBUG:
-                    logger.debug(f"{sink['id']} ({sink['name']}) : {flag_name}")
+                elif level['status'] == StatusEnum.DEBUG:
+                    logger.debug(f"{level['tooltip']} on Sink #{sink['id']} ('{sink['name']}') [{flag_name}]")
 
-        return overall_status
+            overall_tooltip += sink_tooltip
+
+        return {
+            'status': overall_status,
+            'tooltip': overall_tooltip,
+        }
 

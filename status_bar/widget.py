@@ -45,10 +45,14 @@ class StatusBarWidget(QWidget):
         self.layout().addWidget(self._title)
 
         self._ptp_icon = StatusIcon(parent=self)
+        self._ptp_icon.set_tooltip_header("PTP Master:")
         self.layout().addWidget(self._ptp_icon)
 
         self._sinks_icon = StatusIcon(parent=self)
+        self._sinks_icon.set_tooltip_header("Sinks:")
         self.layout().addWidget(self._sinks_icon)
+
+        self.clear()
 
     def update(self, *_, ptp=None, sinks=None):
         if ptp:
@@ -57,6 +61,10 @@ class StatusBarWidget(QWidget):
             self._sinks_icon.update(sinks)
 
     def clear(self):
-        self._ptp_icon.update(StatusEnum.UNKNOWN)
-        self._sinks_icon.update(StatusEnum.UNKNOWN)
+        status = {
+            'status': StatusEnum.UNKNOWN,
+            'tooltip': "Unable to connect to AES67 Daemon",
+        }
+        self._ptp_icon.update(status)
+        self._sinks_icon.update(status)
 

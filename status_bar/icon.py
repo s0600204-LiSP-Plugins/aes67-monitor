@@ -43,11 +43,15 @@ class StatusIcon(QLabel):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        self.update(StatusEnum.UNKNOWN)
+        self._tooltip_header = None
+
+    def set_tooltip_header(self, new_text):
+        self._tooltip_header = new_text
 
     def update(self, new_status):
         self.setPixmap(
             IconTheme.get(
-                self.ICON_MAP.get(new_status)
+                self.ICON_MAP.get(new_status['status'])
             ).pixmap(self.ICON_SIZE)
         )
+        self.setToolTip(f"{self._tooltip_header} {new_status['tooltip']}")
