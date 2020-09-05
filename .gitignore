@@ -1,0 +1,22 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+
+# C extensions
+*.so
+
+# Distribution / packaging
+build/
+eggs/
+*.egg-info/
+*.egg
+
+# Eclipse project
+/.project
+/.pydevproject
+
+# Pycharm IDE
+.idea/*
+
+# QT project files, generated only for pylupdate (qt i18n)
+*.pro
