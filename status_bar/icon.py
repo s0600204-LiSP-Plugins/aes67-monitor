@@ -23,49 +23,16 @@
 # pylint: disable=missing-docstring
 
 # pylint: disable=no-name-in-module
-from PyQt5.QtWidgets import QHBoxLayout, QLabel, QSizePolicy, QWidget
+from PyQt5.QtWidgets import QLabel, QSizePolicy
 
 from lisp.ui.icons import IconTheme
 
-from .util import StatusEnum
-
-class StatusBarWidget(QWidget):
-
-    ICON_SIZE = 12
-
-    def __init__(self, parent):
-        super().__init__(parent=parent)
-
-        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-
-        self.setLayout(QHBoxLayout())
-        self.layout().setSpacing(5)
-        self.layout().setContentsMargins(0, 0, 0, 0)
-
-        self._title = QLabel(parent=self)
-        self._title.setText("AES67:")
-        self._title.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        self.layout().addWidget(self._title)
-
-        self._ptp_icon = StatusIcon(self.ICON_SIZE, parent=self)
-        self.layout().addWidget(self._ptp_icon)
-
-        self._sinks_icon = StatusIcon(self.ICON_SIZE, parent=self)
-        self.layout().addWidget(self._sinks_icon)
-
-    def update(self, *_, ptp=None, sinks=None):
-        if ptp:
-            self._ptp_icon.update(ptp)
-        if sinks:
-            self._sinks_icon.update(sinks)
-
-    def clear(self):
-        self._ptp_icon.update(StatusEnum.UNKNOWN)
-        self._sinks_icon.update(StatusEnum.UNKNOWN)
+from ..util import StatusEnum
 
 
 class StatusIcon(QLabel):
 
+    ICON_SIZE = 12
     ICON_MAP = {
         StatusEnum.UNKNOWN: 'led-off',
         StatusEnum.NORMAL: 'led-running',
@@ -73,15 +40,14 @@ class StatusIcon(QLabel):
         StatusEnum.ERROR: 'led-error',
     }
 
-    def __init__(self, icon_size, parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent=parent)
         self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        self._icon_size = icon_size
         self.update(StatusEnum.UNKNOWN)
 
     def update(self, new_status):
         self.setPixmap(
             IconTheme.get(
                 self.ICON_MAP.get(new_status)
-            ).pixmap(self._icon_size)
+            ).pixmap(self.ICON_SIZE)
         )
