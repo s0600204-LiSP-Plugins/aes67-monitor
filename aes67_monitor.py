@@ -61,7 +61,11 @@ class Aes67Monitor(Plugin):
     def address(self):
         return compose_url(self.SCHEME, self._ip, self._port)
 
+    @property
+    def ip(self):
+        return self._ip
+
     def _open_info_dialog(self):
         if not self._info_dialog:
-            self._info_dialog = StreamInfoDialog()
+            self._info_dialog = StreamInfoDialog(self)
         self._info_dialog.open()

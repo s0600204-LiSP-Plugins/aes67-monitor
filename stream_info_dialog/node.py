@@ -34,10 +34,11 @@ class StreamDirection(enum.Enum):
 
 class StreamDataRole(enum.Enum):
     _userdatarole = Qt.DisplayRole + Qt.UserRole
-    TYPE = _userdatarole + 1
-    IDEN = _userdatarole + 2
-    NAME = _userdatarole + 3
-    CH_COUNT = _userdatarole + 4
+    RAW = _userdatarole
+    SDP = _userdatarole + 1
+    NAME = _userdatarole + 2
+    CH_COUNT = _userdatarole + 3
+    IS_LOCAL = _userdatarole + 4
 
 class StreamInfoNode:
     _size = QSize(128, 48)
@@ -47,12 +48,22 @@ class StreamInfoNode:
         self._model = model
         self.flags = Qt.ItemFlags(Qt.ItemIsEnabled | Qt.ItemNeverHasChildren) # Qt.ItemIsSelectable | 
 
+        self._stream_raw_definition = None
+        self._stream_name = None
+        self._ch_count = None
+        self._is_local = True
+        self._sdp = None
+
     def data(self, role=Qt.DisplayRole):
-        if role == Qt.DisplayRole:
-            return self.rownum()
-        if role == Qt.SizeHintRole:
-            return self._size
-        return None
+        return {
+            Qt.DisplayRole: self.rownum(),
+            Qt.SizeHintRole: lambda: self._size,
+            StreamDataRole.RAW: lambda: self._stream_raw_definition,
+            StreamDataRole.SDP: lambda: self._sdp,
+            StreamDataRole.NAME: lambda: self._stream_name,
+            StreamDataRole.CH_COUNT: lambda: self._ch_count,
+            StreamDataRole.IS_LOCAL: lambda: self._is_local,
+        }.get(role, lambda: None)()
 
     def index(self):
         return self.model().createIndex(self.rownum(), 0, self)
@@ -77,5 +88,24 @@ class StreamInfoNode:
         return self._model.children.index(self)
 
     def setData(self, value, role):
-        # pylint: disable=unused-argument, no-self-use
+        if role == StreamDataRole.RAW:
+            self._stream_raw_definition = value
+            return True
+
+        if role == StreamDataRole.SDP:
+            self._sdp = value
+            return True
+
+        if role == StreamDataRole.NAME:
+            self._stream_name = value
+            return True
+
+        if role == StreamDataRole.CH_COUNT:
+            self._ch_count = value
+            return True
+
+        if role == StreamDataRole.IS_LOCAL:
+            self._is_local = value
+            return True
+
         return False
