@@ -22,10 +22,14 @@
 
 # pylint: disable=missing-docstring
 
+# pylint: disable=no-name-in-module
+from PyQt5.QtWidgets import QAction
+
 # pylint: disable=import-error
 from lisp.core.plugin import Plugin
 from lisp.core.util import compose_url
 
+from aes67_monitor.stream_info_dialog.dialog import StreamInfoDialog
 from aes67_monitor.status_bar.indicator import StatusBarIndicator
 
 class Aes67Monitor(Plugin):
@@ -47,6 +51,17 @@ class Aes67Monitor(Plugin):
         self.indicator = StatusBarIndicator(self)
         self.indicator.show()
 
+        self._info_dialog = None
+
+        self._info_menu_action = QAction('AES67 Audio Streams', self.app.window)
+        self._info_menu_action.triggered.connect(self._open_info_dialog)
+        self.app.window.menuTools.addAction(self._info_menu_action)
+
     @property
     def address(self):
         return compose_url(self.SCHEME, self._ip, self._port)
+
+    def _open_info_dialog(self):
+        if not self._info_dialog:
+            self._info_dialog = StreamInfoDialog()
+        self._info_dialog.open()
