@@ -28,8 +28,6 @@ import requests
 from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtWidgets import QDialog, QDialogButtonBox, QGridLayout, QGroupBox, QLabel, QListView, QPushButton, QVBoxLayout
 
-from lisp.ui.icons import IconTheme
-
 from .delegate import StreamInfoDelegate
 from .model import StreamInfoModelTemplate
 from .node import StreamDirection
@@ -66,49 +64,26 @@ class StreamInfoDialog(QDialog):
         self._sink_list.setModel(self._sink_model)
         self._sink_group.layout().addWidget(self._sink_list)
 
-        self._refresh_button = QPushButton()
-        self._refresh_button.setText("Refresh")
-        self._refresh_button.setIcon(IconTheme.get("view-refresh"))
-        self._refresh_button.pressed.connect(self.update)
-
         self._button_box = QDialogButtonBox(parent=self)
-        self._button_box.addButton(self._refresh_button, QDialogButtonBox.ActionRole)
         self._button_box.addButton(QDialogButtonBox.Close)
+        self._button_box.rejected.connect(self.reject)
         self.layout().addWidget(self._button_box, 1, 0, 1, 2)
 
-        self._button_box.rejected.connect(self.close)
+    def open(self, *args, **kwargs):
+        super().open(*args, **kwargs)
+        self._plugin.poller.add_callback('streams', self.update_local_streams)
+        self._plugin.poller.add_callback('remote_sources', self._source_model.updateRemoteSourcesFromDaemon)
 
-        self.update()
+    def reject(self, *args, **kwargs):
+        super().reject(*args, **kwargs)
+        self._plugin.poller.remove_callback('streams', self.update_local_streams)
+        self._plugin.poller.remove_callback('remote_sources', self._source_model.updateRemoteSourcesFromDaemon)
 
-    def update(self):
-        daemon_config, local_streams, all_sources = self.make_api_request()
-
-        if not daemon_config:
+    def update_local_streams(self, stream_json):
+        if not stream_json:
             return
-
-        local_streams = local_streams.json()
-        self._source_model.updateStreamsFromDaemon(local_streams['sources'])
-        self._sink_model.updateStreamsFromDaemon(local_streams['sinks'])
-
-        self._source_model.updateRemoteSourcesFromDaemon(
-            all_sources.json()['remote_sources'],
-            daemon_config.json()['node_id']
-        )
-
-    def make_api_request(self):
-        config_api_path = "api/config"
-        streams_api_path = "api/streams"
-        all_sources_api_path = "api/browse/sources/all"
-        address = self._plugin.address
-        with requests.Session() as session:
-            try:
-                return (
-                    session.get(address + config_api_path),
-                    session.get(address + streams_api_path),
-                    session.get(address + all_sources_api_path),
-                )
-            except requests.ConnectionError:
-                return (None, None, None)
+        self._source_model.updateStreamsFromDaemon(stream_json['sources'])
+        self._sink_model.updateStreamsFromDaemon(stream_json['sinks'])
 
 
 class _ListView(QListView):

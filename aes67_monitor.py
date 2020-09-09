@@ -29,6 +29,7 @@ from PyQt5.QtWidgets import QAction
 from lisp.core.plugin import Plugin
 from lisp.core.util import compose_url
 
+from aes67_monitor.poller import DaemonPoller
 from aes67_monitor.stream_info_dialog.dialog import StreamInfoDialog
 from aes67_monitor.status_bar.indicator import StatusBarIndicator
 
@@ -47,6 +48,10 @@ class Aes67Monitor(Plugin):
 
         self._ip = "127.0.0.1"
         self._port = 8080
+        self._daemon_name = None
+
+        self.poller = DaemonPoller(self)
+        self.poller.add_callback('config', self._update_daemon_name)
 
         self.indicator = StatusBarIndicator(self)
         self.indicator.show()
@@ -64,6 +69,13 @@ class Aes67Monitor(Plugin):
     @property
     def ip(self):
         return self._ip
+
+    @property
+    def daemon_name(self):
+        return self._daemon_name
+
+    def _update_daemon_name(self, config_json):
+        self._daemon_name = config_json['node_id'] if config_json else None
 
     def _open_info_dialog(self):
         if not self._info_dialog:

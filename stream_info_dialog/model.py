@@ -91,10 +91,11 @@ class StreamInfoModelTemplate(QAbstractItemModel):
                 self._add_node(stream_id, definition)
         self.endInsertRows()
 
-    def updateRemoteSourcesFromDaemon(self, sources, daemon_name):
+    def updateRemoteSourcesFromDaemon(self, sources):
         if self._direction != StreamDirection.SOURCE or not sources:
             return
-
+        sources = sources['remote_sources']
+        daemon_name = self._plugin.daemon_name
         rownum = self.__len__()
         self.beginInsertRows(QModelIndex(), rownum, rownum)
         for definition in sources:

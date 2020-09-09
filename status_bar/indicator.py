@@ -27,16 +27,12 @@ import logging
 import requests
 
 # pylint: disable=import-error
-from lisp.core.clock import Clock
-from lisp.core.util import compose_url
 from lisp.ui.mainwindow import MainStatusBar
 
-from ..util import StatusEnum
+from ..util import StatusEnum, make_api_get_request
 from .widget import StatusBarWidget
 
 logger = logging.getLogger(__name__) # pylint: disable=invalid-name
-
-UPDATE_INTERVAL = 2000 # milliseconds
 
 SINK_FLAGS = {
     "rtp_seq_id_error": {
@@ -76,19 +72,15 @@ SINK_FLAGS = {
 
 class StatusBarIndicator:
 
-    ptp_api_path = "api/ptp/status"
-    sinks_api_path = "api/sinks"
-    sink_status_api_path = "api/sink/status/"
-
     def __init__(self, plugin):
         self._plugin = plugin
-        self._clock = Clock(UPDATE_INTERVAL)
         self._widget = None
 
     def show(self):
         if not self._widget:
             self._widget = StatusBarWidget()
-        self._clock.add_callback(self.run_update)
+        self._plugin.poller.add_callback('ptp_status', self.update_ptp)
+        self._plugin.poller.add_callback('streams', self.update_sinks)
 
         # MainWindow > .statusBar > MainStatusBar
         status_bar = self._plugin.app.window.statusBar().findChild(MainStatusBar)
@@ -98,32 +90,19 @@ class StatusBarIndicator:
     def hide(self):
         if not self._widget:
             return
-        self._clock.remove_callback(self.run_update)
+        self._plugin.poller.remove_callback('ptp_status', self.update_ptp)
+        self._plugin.poller.remove_callback('streams', self.update_sinks)
 
         status_bar = self._plugin.app.window.statusBar().findChild(MainStatusBar)
         status_layout = status_bar.layout()
         status_layout.layout().removeWidget(self._widget)
 
-    def run_update(self):
-        with requests.Session() as session:
-            address = self._plugin.address
-            ptp = self.fetch_ptp_status(session, address)
-            if not ptp:
-                self._widget.clear()
-                return
+    def update_ptp(self, json):
+        if not json:
+            self._widget.clear()
+            return
 
-            self._widget.update(
-                ptp=ptp,
-                sinks=self.fetch_sink_status(session, address)
-            )
-
-    def fetch_ptp_status(self, session, address):
-        try:
-            reply = session.get(address + self.ptp_api_path)
-        except requests.ConnectionError:
-            return False
-
-        return {
+        self._widget.update_ptp_status({
             'locked': {
                 'status': StatusEnum.NORMAL,
                 'tooltip': "Locked",
@@ -136,19 +115,21 @@ class StatusBarIndicator:
                 'status': StatusEnum.WARNING,
                 'tooltip': "Connecting...",
             },
-        }.get(reply.json()['status'])
+        }.get(json['status']))
 
-    def fetch_sink_status(self, session, address):
-        try:
-            reply = session.get(address + self.sinks_api_path)
-        except requests.ConnectionError:
-            return False
+    def update_sinks(self, json):
+        if not json:
+            return
 
         overall_status = StatusEnum.NORMAL
         overall_tooltip = ""
-        sinks = reply.json()['sinks']
-        for sink in sinks:
-            sink_reply = session.get(address + self.sink_status_api_path + str(sink['id']))
+
+        # @todo: reuse from poller (somehow)
+        session = requests.session()
+        address = self._plugin.address
+
+        for sink in json['sinks']:
+            sink_reply = make_api_get_request(session, address, 'sink_status', sink['id'])
             sink_tooltip = f"\n#{sink['id']}: {sink['name']}"
 
             for flag_name, flag_value in sink_reply.json()['sink_flags'].items():
@@ -181,8 +162,7 @@ class StatusBarIndicator:
 
             overall_tooltip += sink_tooltip
 
-        return {
+        self._widget.update_sinks_status({
             'status': overall_status,
             'tooltip': overall_tooltip,
-        }
-
+        })

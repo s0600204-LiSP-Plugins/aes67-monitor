@@ -54,11 +54,11 @@ class StatusBarWidget(QWidget):
 
         self.clear()
 
-    def update(self, *_, ptp=None, sinks=None):
-        if ptp:
-            self._ptp_icon.update(ptp)
-        if sinks:
-            self._sinks_icon.update(sinks)
+    def update_ptp_status(self, ptp):
+        self._ptp_icon.update(ptp)
+
+    def update_sinks_status(self, sinks):
+        self._sinks_icon.update(sinks)
 
     def clear(self):
         status = {

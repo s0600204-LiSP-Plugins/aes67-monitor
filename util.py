@@ -24,6 +24,16 @@
 
 from enum import Enum
 
+import requests
+
+
+API_PATHS = {
+    'config': "api/config",
+    'ptp_status': "api/ptp/status",
+    'remote_sources': "api/browse/sources/all",
+    'sink_status': "api/sink/status/",
+    'streams': "api/streams",
+}
 
 class StatusEnum(Enum):
     DEBUG = -2
@@ -31,3 +41,15 @@ class StatusEnum(Enum):
     NORMAL = 0
     WARNING = 1
     ERROR = 2
+
+def make_api_get_request(session, address, what, opt_arg=None):
+    path = API_PATHS.get(what)
+    if not path:
+        return None
+
+    try:
+        if opt_arg is not None:
+            return session.get(f"{address}{path}{opt_arg}")
+        return session.get(f"{address}{path}")
+    except requests.ConnectionError:
+        return None
