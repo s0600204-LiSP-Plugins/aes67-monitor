@@ -74,28 +74,48 @@ class StreamInfoModelTemplate(QAbstractItemModel):
         idx = self._children_ids.index(stream_id)
         self._amend_node(self.children[idx], definition)
 
+    def _cull_old_streams(self, old_streams, cull_local):
+        for stream_id in old_streams:
+            if isinstance(stream_id, int) ^ cull_local:
+                # IDs of local streams have an integer ID
+                # If we're culling local streams, we don't wish to skip this id
+                # It we're culling remote streams, we do wish to skip this id
+                continue
+
+            idx = self._children_ids.index(stream_id)
+            self.beginRemoveRows(QModelIndex(), idx, idx)
+            del self._children_ids[idx]
+            del self.children[idx]
+            self.endRemoveRows()
+
     def updateStreamsFromDaemon(self, streams):
         if not streams:
             return
+
+        old_streams = list(self._children_ids)
 
         rownum = self.__len__()
         self.beginInsertRows(QModelIndex(), rownum, rownum)
         for definition in streams:
             stream_id = definition['id']
-            if self._direction == StreamDirection.SOURCE:
-                stream_id = f"source_{stream_id}"
 
             if stream_id in self._children_ids:
                 self._update_node(stream_id, definition)
+                old_streams.remove(stream_id)
             else:
                 self._add_node(stream_id, definition)
         self.endInsertRows()
+
+        if old_streams:
+            self._cull_old_streams(old_streams, True)
 
     def updateRemoteSourcesFromDaemon(self, sources):
         if self._direction != StreamDirection.SOURCE or not sources:
             return
         sources = sources['remote_sources']
         daemon_name = self._plugin.daemon_name
+        old_streams = list(self._children_ids)
+
         rownum = self.__len__()
         self.beginInsertRows(QModelIndex(), rownum, rownum)
         for definition in sources:
@@ -117,6 +137,9 @@ class StreamInfoModelTemplate(QAbstractItemModel):
                 node.setData(False, StreamDataRole.IS_LOCAL)
 
         self.endInsertRows()
+
+        if old_streams:
+            self._cull_old_streams(old_streams, False)
 
     def childCount(self, index):
         return 0 if index.isValid() else self.__len__()
