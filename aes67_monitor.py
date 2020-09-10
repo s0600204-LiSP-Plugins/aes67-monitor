@@ -28,8 +28,10 @@ from PyQt5.QtWidgets import QAction
 # pylint: disable=import-error
 from lisp.core.plugin import Plugin
 from lisp.core.util import compose_url
+from lisp.ui.settings.app_configuration import AppConfigurationDialog
 
 from aes67_monitor.poller import DaemonPoller
+from aes67_monitor.settings_page import Aes67Settings
 from aes67_monitor.stream_info_dialog.dialog import StreamInfoDialog
 from aes67_monitor.status_bar.indicator import StatusBarIndicator
 
@@ -46,9 +48,11 @@ class Aes67Monitor(Plugin):
     def __init__(self, app):
         super().__init__(app)
 
-        self._ip = "127.0.0.1"
-        self._port = 8080
         self._daemon_name = None
+
+        # Register the settings widget
+        AppConfigurationDialog.registerSettingsPage(
+            'plugins.aes67_monitor', Aes67Settings, Aes67Monitor.Config)
 
         self.poller = DaemonPoller(self)
         self.poller.add_callback('config', self._update_daemon_name)
@@ -64,11 +68,11 @@ class Aes67Monitor(Plugin):
 
     @property
     def address(self):
-        return compose_url(self.SCHEME, self._ip, self._port)
+        return compose_url(self.SCHEME, self.Config["daemon_ip"], self.Config["daemon_port"])
 
     @property
     def ip(self):
-        return self._ip
+        return self.Config["daemon_ip"]
 
     @property
     def daemon_name(self):

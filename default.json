@@ -1,0 +1,6 @@
+{
+  "_version_": "0.1",
+  "_enabled_": true,
+  "daemon_ip": "127.0.0.1",
+  "daemon_port": 8080
+}
