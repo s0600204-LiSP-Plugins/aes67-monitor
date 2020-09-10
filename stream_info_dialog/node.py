@@ -39,6 +39,7 @@ class StreamDataRole(enum.Enum):
     NAME = _userdatarole + 2
     CH_COUNT = _userdatarole + 3
     IS_LOCAL = _userdatarole + 4
+    DIRECTION = _userdatarole + 5
 
 class StreamInfoNode:
     _size = QSize(128, 48)
@@ -63,6 +64,7 @@ class StreamInfoNode:
             StreamDataRole.NAME: lambda: self._stream_name,
             StreamDataRole.CH_COUNT: lambda: self._ch_count,
             StreamDataRole.IS_LOCAL: lambda: self._is_local,
+            StreamDataRole.DIRECTION: lambda: self._direction,
         }.get(role, lambda: None)()
 
     def index(self):

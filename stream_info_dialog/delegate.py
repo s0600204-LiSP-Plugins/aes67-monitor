@@ -26,7 +26,7 @@
 from PyQt5.QtCore import QRect, Qt
 from PyQt5.QtWidgets import QApplication, QStyle, QStyledItemDelegate, QStyleOptionFocusRect
 
-from .node import StreamDataRole
+from .node import StreamDataRole, StreamDirection
 
 class StreamInfoDelegate(QStyledItemDelegate):
     '''Display a Source or Sink'''
@@ -79,14 +79,15 @@ class StreamInfoDelegate(QStyledItemDelegate):
         )
         painter.drawText(ch_rect, Qt.AlignVCenter, f"{index.internalPointer().data(StreamDataRole.CH_COUNT)} ch")
 
-        info_rect = QRect(option.rect)
-        info_rect.adjust(
-            w / 2 + self.margin,
-            h / 2 + self.margin,
-            -self.margin,
-            -self.margin
-        )
-        loc_text = 'Local' if index.internalPointer().data(StreamDataRole.IS_LOCAL) else 'Remote'
-        painter.drawText(info_rect, Qt.AlignRight | Qt.AlignVCenter, loc_text)
+        if index.internalPointer().data(StreamDataRole.DIRECTION) == StreamDirection.SOURCE:
+            info_rect = QRect(option.rect)
+            info_rect.adjust(
+                w / 2 + self.margin,
+                h / 2 + self.margin,
+                -self.margin,
+                -self.margin
+            )
+            loc_text = 'Local' if index.internalPointer().data(StreamDataRole.IS_LOCAL) else 'Remote'
+            painter.drawText(info_rect, Qt.AlignRight | Qt.AlignVCenter, loc_text)
 
         painter.restore()
