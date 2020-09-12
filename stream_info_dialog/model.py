@@ -141,6 +141,21 @@ class StreamInfoModelTemplate(QAbstractItemModel):
         if old_streams:
             self._cull_old_streams(old_streams, False)
 
+    def localStreamIds(self):
+        if self._direction == StreamDirection.SINK:
+            return self._children_ids
+
+        ids = []
+        for stream_id in self._children_ids:
+            if isinstance(stream_id, int):
+                ids.append(stream_id)
+        return ids
+
+    def streamId(self, index):
+        if not index.isValid():
+            return None
+        return self._children_ids[self.children.index(index.internalPointer())]
+
     def childCount(self, index):
         return 0 if index.isValid() else self.__len__()
 

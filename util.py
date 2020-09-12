@@ -32,6 +32,7 @@ API_PATHS = {
     'ptp_status': "api/ptp/status",
     'remote_sources': "api/browse/sources/all",
     'sink_status': "api/sink/status/",
+    'source_edit': "api/source/",
     'streams': "api/streams",
 }
 
@@ -51,5 +52,31 @@ def make_api_get_request(session, address, what, opt_arg=None):
         if opt_arg is not None:
             return session.get(f"{address}{path}{opt_arg}")
         return session.get(f"{address}{path}")
+    except requests.ConnectionError:
+        return None
+
+def make_api_put_request(session, address, what, arg, json_data):
+    if not arg or not json_data:
+        return None
+
+    path = API_PATHS.get(what)
+    if not path:
+        return None
+
+    try:
+        return session.put(f"{address}{path}{arg}", json=json_data)
+    except requests.ConnectionError:
+        return None
+
+def make_api_delete_request(session, address, what, arg):
+    if not arg:
+        return None
+
+    path = API_PATHS.get(what)
+    if not path:
+        return None
+
+    try:
+        return session.delete(f"{address}{path}{arg}")
     except requests.ConnectionError:
         return None

@@ -47,7 +47,7 @@ class StreamInfoNode:
     def __init__(self, model, direction):
         self._direction = direction
         self._model = model
-        self.flags = Qt.ItemFlags(Qt.ItemIsEnabled | Qt.ItemNeverHasChildren) # Qt.ItemIsSelectable | 
+        self.flags = Qt.ItemFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled | Qt.ItemNeverHasChildren)
 
         self._stream_raw_definition = None
         self._stream_name = None
