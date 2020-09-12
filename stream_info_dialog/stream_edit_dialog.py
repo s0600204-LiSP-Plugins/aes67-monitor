@@ -111,7 +111,7 @@ class StreamEditDialog(QDialog):
         if self._editing_id is not None:
             stream_id = self._editing_id
         else:
-            stream_id = max(self.parent().local_stream_ids(self._direction)) + 1
+            stream_id = max(self.parent().local_stream_ids()) + 1
 
         reply = make_api_put_request(
             requests,

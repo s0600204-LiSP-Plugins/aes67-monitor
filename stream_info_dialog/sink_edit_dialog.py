@@ -125,7 +125,7 @@ class SinkEditDialog(StreamEditDialog):
         self._sdp_sources.clear()
         self._sdp_sources.addItem("-- Manual Entry Below --", None)
 
-        model = self.parent().source_model()
+        model = self.parent().parent().sources.model
         for source in model:
             sdp = source.data(StreamDataRole.SDP)
             if not sdp:

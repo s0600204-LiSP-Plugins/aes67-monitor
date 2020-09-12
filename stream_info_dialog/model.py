@@ -92,7 +92,7 @@ class StreamInfoModelTemplate(QAbstractItemModel):
             del self.children[idx]
             self.endRemoveRows()
 
-    def updateStreamsFromDaemon(self, streams):
+    def updateLocalStreamsFromDaemon(self, streams):
         if not streams:
             return
 
@@ -113,16 +113,16 @@ class StreamInfoModelTemplate(QAbstractItemModel):
         if old_streams:
             self._cull_old_streams(old_streams, True)
 
-    def updateRemoteSourcesFromDaemon(self, sources):
-        if self._direction != StreamDirection.SOURCE or not sources:
+    def updateRemoteStreamsFromDaemon(self, streams):
+        if self._direction != StreamDirection.SOURCE or not streams:
             return
-        sources = sources['remote_sources']
+
         daemon_name = self._plugin.daemon_name
         old_streams = list(self._children_ids)
 
         rownum = self.__len__()
         self.beginInsertRows(QModelIndex(), rownum, rownum)
-        for definition in sources:
+        for definition in streams:
 
             # If this source is, in fact, a local one
             if definition['address'] == self._plugin.ip:
