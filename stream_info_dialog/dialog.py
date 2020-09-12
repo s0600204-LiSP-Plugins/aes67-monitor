@@ -26,7 +26,7 @@ import requests
 
 # pylint: disable=no-name-in-module
 from PyQt5.QtCore import Qt, QSize
-from PyQt5.QtWidgets import QDialog, QDialogButtonBox, QGridLayout, QGroupBox, QLabel, QListView, QMessageBox, QPushButton, QVBoxLayout
+from PyQt5.QtWidgets import QDialog, QDialogButtonBox, QGridLayout, QGroupBox, QLabel, QListView, QMessageBox, QPushButton
 
 from lisp.ui.icons import IconTheme
 
@@ -34,6 +34,7 @@ from ..util import make_api_delete_request
 from .delegate import StreamInfoDelegate
 from .model import StreamInfoModelTemplate
 from .node import StreamDataRole, StreamDirection
+from .sink_edit_dialog import SinkEditDialog
 from .source_edit_dialog import SourceEditDialog
 
 
@@ -51,6 +52,7 @@ class StreamInfoDialog(QDialog):
         self._sink_model = StreamInfoModelTemplate(plugin, StreamDirection.SINK)
 
         self._source_edit_dialog = None
+        self._sink_edit_dialog = None
 
         # Sources
         self._source_group = QGroupBox(parent=self)
@@ -87,15 +89,34 @@ class StreamInfoDialog(QDialog):
         # Sinks
         self._sink_group = QGroupBox(parent=self)
         self._sink_group.setTitle("Local Audio Sinks")
-        self._sink_group.setLayout(QVBoxLayout())
+        self._sink_group.setLayout(QGridLayout())
         self.layout().addWidget(self._sink_group, 0, 1)
 
         self._sink_list = _ListView()
         self._sink_list.setModel(self._sink_model)
-        self._sink_group.layout().addWidget(self._sink_list)
+        self._sink_list.selectionModel().selectionChanged.connect(self._on_sink_list_select)
+        self._sink_group.layout().addWidget(self._sink_list, 0, 0, 1, 3)
 
-        self.layout().setColumnStretch(0, 1)
-        self.layout().setColumnStretch(1, 1)
+        self._sink_new_btn = QPushButton(parent=self._sink_group)
+        self._sink_new_btn.setText("New")
+        self._sink_new_btn.setIcon(IconTheme.get("list-add"))
+        self._sink_new_btn.pressed.connect(self._new_sink)
+        self._sink_new_btn.setDisabled(True)
+        self._sink_group.layout().addWidget(self._sink_new_btn, 1, 0)
+
+        self._sink_edit_btn = QPushButton(parent=self._sink_group)
+        self._sink_edit_btn.setText("Edit")
+        self._sink_edit_btn.setIcon(IconTheme.get("applications-accessories"))
+        self._sink_edit_btn.pressed.connect(self._edit_sink)
+        self._sink_edit_btn.setDisabled(True)
+        self._sink_group.layout().addWidget(self._sink_edit_btn, 1, 1)
+
+        self._sink_delete_btn = QPushButton(parent=self._sink_group)
+        self._sink_delete_btn.setText("Delete")
+        self._sink_delete_btn.setIcon(IconTheme.get("list-remove"))
+        self._sink_delete_btn.pressed.connect(self._del_sink)
+        self._sink_delete_btn.setDisabled(True)
+        self._sink_group.layout().addWidget(self._sink_delete_btn, 1, 2)
 
         # Close button
         self._button_box = QDialogButtonBox(parent=self)
@@ -115,9 +136,12 @@ class StreamInfoDialog(QDialog):
 
     def update_local_streams(self, stream_json):
         self._source_new_btn.setEnabled(bool(stream_json))
+        self._sink_new_btn.setEnabled(bool(stream_json))
         if not stream_json:
             self._source_edit_btn.setEnabled(False)
             self._source_delete_btn.setEnabled(False)
+            self._sink_edit_btn.setEnabled(False)
+            self._sink_delete_btn.setEnabled(False)
             return
         self._source_model.updateStreamsFromDaemon(stream_json['sources'])
         self._sink_model.updateStreamsFromDaemon(stream_json['sinks'])
@@ -171,6 +195,48 @@ class StreamInfoDialog(QDialog):
         is_local = self._source_model.data(idx, StreamDataRole.IS_LOCAL)
         self._source_edit_btn.setEnabled(is_local)
         self._source_delete_btn.setEnabled(is_local)
+
+    def _init_sink_dialog(self):
+        self._sink_edit_dialog = SinkEditDialog(self._plugin, parent=self)
+
+    def _new_sink(self):
+        if not self._sink_edit_dialog:
+            self._init_sink_dialog()
+        self._sink_edit_dialog.clear()
+        self._sink_edit_dialog.exec()
+
+    def _edit_sink(self):
+        idx = self._sink_list.selectionModel().currentIndex()
+        if not idx.isValid():
+            self._sink_edit_btn.setEnabled(False)
+            self._sink_delete_btn.setEnabled(False)
+            return
+
+        if not self._sink_edit_dialog:
+            self._init_sink_dialog()
+
+        self._sink_edit_dialog.deserialise(
+            self._sink_model.data(idx, StreamDataRole.RAW)
+        )
+        self._sink_edit_dialog.exec()
+
+    def _del_sink(self):
+        idx = self._sink_list.selectionModel().currentIndex()
+        if not idx.isValid():
+            self._sink_edit_btn.setEnabled(False)
+            self._sink_delete_btn.setEnabled(False)
+            return
+        msg_dia = _DelMsgBox(parent=self);
+        msg_dia.setText(f'Delete sink "{self._sink_model.data(idx, StreamDataRole.NAME)}"?')
+
+        if msg_dia.exec() & QMessageBox.Yes:
+            make_api_delete_request(
+                requests, self._plugin.address, 'sink_edit', self._sink_model.streamId(idx)
+            )
+
+    def _on_sink_list_select(self, *args):
+        self._sink_edit_btn.setEnabled(True)
+        self._sink_delete_btn.setEnabled(True)
 
 class _ListView(QListView):
     def __init__(self, *args, **kwargs):

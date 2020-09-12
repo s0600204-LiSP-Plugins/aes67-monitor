@@ -31,6 +31,7 @@ API_PATHS = {
     'config': "api/config",
     'ptp_status': "api/ptp/status",
     'remote_sources': "api/browse/sources/all",
+    'sink_edit': "api/sink/",
     'sink_status': "api/sink/status/",
     'source_edit': "api/source/",
     'streams': "api/streams",
