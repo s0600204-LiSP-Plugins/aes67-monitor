@@ -31,11 +31,11 @@ from PyQt5.QtWidgets import QDialog, QDialogButtonBox, QGridLayout, QGroupBox, Q
 from lisp.ui.icons import IconTheme
 
 from ..util import make_api_delete_request
-from .delegate import StreamInfoDelegate
 from .model import StreamInfoModelTemplate
 from .node import StreamDataRole, StreamDirection
 from .sink_edit_dialog import SinkEditDialog
 from .source_edit_dialog import SourceEditDialog
+from .ui import StreamDeleteMessageBox, StreamListView
 
 
 class StreamInfoDialog(QDialog):
@@ -60,7 +60,7 @@ class StreamInfoDialog(QDialog):
         self._source_group.setLayout(QGridLayout())
         self.layout().addWidget(self._source_group, 0, 0)
 
-        self._source_list = _ListView()
+        self._source_list = StreamListView()
         self._source_list.setModel(self._source_model)
         self._source_list.selectionModel().selectionChanged.connect(self._on_source_list_select)
         self._source_group.layout().addWidget(self._source_list, 0, 0, 1, 3)
@@ -92,7 +92,7 @@ class StreamInfoDialog(QDialog):
         self._sink_group.setLayout(QGridLayout())
         self.layout().addWidget(self._sink_group, 0, 1)
 
-        self._sink_list = _ListView()
+        self._sink_list = StreamListView()
         self._sink_list.setModel(self._sink_model)
         self._sink_list.selectionModel().selectionChanged.connect(self._on_sink_list_select)
         self._sink_group.layout().addWidget(self._sink_list, 0, 0, 1, 3)
@@ -185,7 +185,7 @@ class StreamInfoDialog(QDialog):
             self._source_edit_btn.setEnabled(False)
             self._source_delete_btn.setEnabled(False)
             return
-        msg_dia = _DelMsgBox(parent=self);
+        msg_dia = StreamDeleteMessageBox(parent=self);
         msg_dia.setText(f'Delete source "{self._source_model.data(idx, StreamDataRole.NAME)}"?')
 
         if msg_dia.exec() & QMessageBox.Yes:
@@ -229,7 +229,7 @@ class StreamInfoDialog(QDialog):
             self._sink_edit_btn.setEnabled(False)
             self._sink_delete_btn.setEnabled(False)
             return
-        msg_dia = _DelMsgBox(parent=self);
+        msg_dia = StreamDeleteMessageBox(parent=self);
         msg_dia.setText(f'Delete sink "{self._sink_model.data(idx, StreamDataRole.NAME)}"?')
 
         if msg_dia.exec() & QMessageBox.Yes:
@@ -240,20 +240,3 @@ class StreamInfoDialog(QDialog):
     def _on_sink_list_select(self, *args):
         self._sink_edit_btn.setEnabled(True)
         self._sink_delete_btn.setEnabled(True)
-
-class _ListView(QListView):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._delegate = StreamInfoDelegate()
-        self.setItemDelegate(self._delegate)
-        self.setSpacing(self._delegate.margin)
-        self.setUniformItemSizes(True)
-
-class _DelMsgBox(QMessageBox):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.setWindowTitle("Deleting Audio Stream")
-        self.setInformativeText("Warning: This cannot be undone!")
-        self.setIcon(QMessageBox.Question)
-        self.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-        self.setDefaultButton(QMessageBox.No)
