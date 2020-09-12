@@ -22,30 +22,20 @@
 
 # pylint: disable=missing-docstring
 
-import requests
-
 # pylint: disable=no-name-in-module
-from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QCheckBox,
     QComboBox,
-    QDialog,
-    QDialogButtonBox,
-    QFormLayout,
-    QLabel,
     QLineEdit,
-    QSpinBox,
     QTextEdit,
 )
 
-from ..util import make_api_put_request
 from .node import StreamDirection
+from .stream_edit_dialog import StreamEditDialog
+from .ui import GroupHeader
 
 
-class SinkEditDialog(QDialog):
-
-    # See comment in SourceEditDialog class
-    _channel_limit = 8
+class SinkEditDialog(StreamEditDialog):
 
     # Not sure about these...
     _sample_delays = [
@@ -56,32 +46,23 @@ class SinkEditDialog(QDialog):
         960,
     ]
 
-    def __init__(self, plugin, **kwargs):
-        super().__init__(**kwargs)
-        self._plugin = plugin
-        self._editing_id = None
+    def __init__(self, *args, **kwargs):
+        super().__init__(StreamDirection.SINK, *args, **kwargs)
 
         self.setMinimumWidth(600)
-        self.setLayout(QFormLayout())
 
         # Meta
-        self._meta_label = QLabel()
-        self._meta_label.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
-        self._meta_label.setIndent(2)
-        self._meta_label.setMargin(2)
-        self._meta_label.setText("Sink")
-        self.layout().addRow(self._meta_label)
+        self._meta_header = GroupHeader()
+        self._meta_header.setText("Sink")
+        self.layout().addRow(self._meta_header)
 
-        self._sink_name = QLineEdit()
-        self.layout().addRow("Sink Name:", self._sink_name)
+        self._stream_name = QLineEdit()
+        self.layout().addRow("Sink Name:", self._stream_name)
 
         # Source
-        self._source_label = QLabel()
-        self._source_label.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
-        self._source_label.setIndent(4)
-        self._source_label.setMargin(2)
-        self._source_label.setText("Attached Source")
-        self.layout().addRow(self._source_label)
+        self._source_header = GroupHeader()
+        self._source_header.setText("Attached Source")
+        self.layout().addRow(self._source_header)
 
         self._use_sdp = QCheckBox()
         self._use_sdp.setChecked(False)
@@ -103,33 +84,12 @@ class SinkEditDialog(QDialog):
         self.layout().addRow("Ignore Source PTP Master:", self._ignore_refclk_gmid)
 
         # Channels
-        self._channels_label = QLabel()
-        self._channels_label.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
-        self._channels_label.setIndent(4)
-        self._channels_label.setMargin(2)
-        self._channels_label.setText("ALSA Channels")
-        self.layout().addRow(self._channels_label)
-
-        self._channel_count = QSpinBox()
-        self._channel_count.setRange(1, self._channel_limit)
-        self._channel_count.valueChanged.connect(self._on_channel_count_change)
-        self.layout().addRow("Channel Count:", self._channel_count)
-
-        self._channel_start = QSpinBox()
-        self._channel_start.setRange(1, self._channel_limit)
-        self._channel_start.valueChanged.connect(self._on_channel_start_change)
-        self.layout().addRow("Start Channel:", self._channel_start)
-
-        self._channel_list = QLabel()
-        self.layout().addRow("Mapped Channels:", self._channel_list)
+        self._place_channel_widgets()
 
         # Audio Configuration
-        self._spec_label = QLabel()
-        self._spec_label.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
-        self._spec_label.setIndent(4)
-        self._spec_label.setMargin(2)
-        self._spec_label.setText("Audio Config")
-        self.layout().addRow(self._spec_label)
+        self._spec_header = GroupHeader()
+        self._spec_header.setText("Audio Config")
+        self.layout().addRow(self._spec_header)
 
         self._delay = QComboBox()
         for sample in self._sample_delays:
@@ -137,27 +97,7 @@ class SinkEditDialog(QDialog):
         self.layout().addRow("Playout Sample Delay:", self._delay)
 
         # Buttons
-        self._button_box = QDialogButtonBox()
-        self._button_box.setStandardButtons(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
-        self._button_box.accepted.connect(self.submit)
-        self._button_box.rejected.connect(self.reject)
         self.layout().addRow(self._button_box)
-
-    def _on_channel_count_change(self, value):
-        value -= 1
-        self._channel_start.setMaximum(self._channel_limit - value)
-        self._update_channel_message()
-
-    def _on_channel_start_change(self, value):
-        value -= 1
-        self._channel_count.setMaximum(self._channel_limit - value)
-        self._update_channel_message()
-
-    def _update_channel_message(self):
-        start = self._channel_start.value()
-        self._channel_list.setText(
-            ", ".join([str(i + start) for i in range(self._channel_count.value())])
-        )
 
     def _on_use_sdp_pressed(self, _):
         use_sdp = self._use_sdp.isChecked()
@@ -169,43 +109,35 @@ class SinkEditDialog(QDialog):
             self._sdp_raw.setPlainText("")
 
     def clear(self):
-        self._editing_id = None
+        super().clear()
         self.setWindowTitle("Creating New Sink")
 
-        self._sink_name.setText("New Sink")
+        self._stream_name.setText("New Sink")
 
         self._use_sdp.setChecked(True)
         self._sdp_url.setText("")
         self._sdp_raw.setText("")
 
-        self._channel_start.setValue(1)
-        self._channel_count.setValue(2)
-
-    def deserialise(self, sink_json):
-        self._editing_id = sink_json['id']
-        self.setWindowTitle(f"Editing Sink '{sink_json['name']}'")
+    def deserialise(self, stream_definition):
+        super().deserialise(stream_definition)
+        self.setWindowTitle(f"Editing Sink '{stream_definition['name']}'")
 
         # Meta
-        self._sink_name.setText(sink_json['name'])
+        self._stream_name.setText(stream_definition['name'])
 
         # Source
-        self._use_sdp.setChecked(sink_json['use_sdp'])
-        self._sdp_url.setText(sink_json['source'])
-        self._sdp_raw.setPlainText(sink_json['sdp'])
-        self._ignore_refclk_gmid.setChecked(sink_json['ignore_refclk_gmid'])
-
-        # Update channel mapping
-        self._channel_start.setValue(1)
-        self._channel_count.setValue(len(sink_json['map']))
-        self._channel_start.setValue(sink_json['map'][0] + 1)
+        self._use_sdp.setChecked(stream_definition['use_sdp'])
+        self._sdp_url.setText(stream_definition['source'])
+        self._sdp_raw.setPlainText(stream_definition['sdp'])
+        self._ignore_refclk_gmid.setChecked(stream_definition['ignore_refclk_gmid'])
 
         # Audio Config
-        self._delay.setCurrentText(str(sink_json['delay']))
+        self._delay.setCurrentText(str(stream_definition['delay']))
 
     def serialise(self):
         start = self._channel_start.value() - 1
         return {
-            "name": self._sink_name.text(),
+            "name": self._stream_name.text(),
             "io": "Audio Device",
             "delay": int(self._delay.currentText()),
             "use_sdp": self._use_sdp.isChecked(),
@@ -214,23 +146,3 @@ class SinkEditDialog(QDialog):
             "ignore_refclk_gmid": self._ignore_refclk_gmid.isChecked(),
             "map": [i + start for i in range(self._channel_count.value())]
         }
-
-    def submit(self):
-        if self._editing_id is not None:
-            stream_id = self._editing_id
-        else:
-            stream_id = max(self.parent().local_stream_ids(StreamDirection.SINK)) + 1
-
-        reply = make_api_put_request(
-            requests,
-            self._plugin.address,
-            'sink_edit',
-            stream_id,
-            self.serialise()
-        )
-
-        if reply:
-            self.close()
-        else:
-            # todo: Implement error checking/messages
-            print(reply)

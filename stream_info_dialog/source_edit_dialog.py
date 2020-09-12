@@ -22,26 +22,20 @@
 
 # pylint: disable=missing-docstring
 
-import requests
-
 # pylint: disable=no-name-in-module
-from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QCheckBox,
     QComboBox,
-    QDialog,
-    QDialogButtonBox,
-    QFormLayout,
-    QLabel,
     QLineEdit,
     QSpinBox,
 )
 
-from ..util import make_api_put_request
 from .node import StreamDirection
+from .stream_edit_dialog import StreamEditDialog
+from .ui import GroupHeader
 
 
-class SourceEditDialog(QDialog):
+class SourceEditDialog(StreamEditDialog):
 
     _aes67_base = {
         "codec": "L24",
@@ -57,11 +51,6 @@ class SourceEditDialog(QDialog):
         "ttl": 15,
     }
 
-    # The daemon/kernal advertises 128 channels, however only
-    # the first 8 are usable (for some reason).
-    # Attempting to attach to channel 9+ causes a HTTP 400
-    _channel_limit = 8
-
     _codecs = {
         "L16": "L16",
         "L24": "L24",
@@ -75,56 +64,29 @@ class SourceEditDialog(QDialog):
     }
     _packet_sample_sizes = [12, 16, 48, 96, 192]
 
-    def __init__(self, plugin, **kwargs):
-        super().__init__(**kwargs)
-        self._plugin = plugin
-        self._editing_id = None
+    def __init__(self, *args, **kwargs):
+        super().__init__(StreamDirection.SOURCE, *args, **kwargs)
 
         self.setMinimumWidth(350)
-        self.setLayout(QFormLayout())
 
         # Meta
-        self._meta_label = QLabel()
-        self._meta_label.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
-        self._meta_label.setIndent(2)
-        self._meta_label.setMargin(2)
-        self._meta_label.setText("Source")
-        self.layout().addRow(self._meta_label)
+        self._meta_header = GroupHeader()
+        self._meta_header.setText("Source")
+        self.layout().addRow(self._meta_header)
 
-        self._source_name = QLineEdit()
-        self.layout().addRow("Source Name:", self._source_name)
+        self._stream_name = QLineEdit()
+        self.layout().addRow("Source Name:", self._stream_name)
 
         self._source_enabled = QCheckBox()
         self.layout().addRow("Source Enabled:", self._source_enabled)
 
         # Channels
-        self._channels_label = QLabel()
-        self._channels_label.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
-        self._channels_label.setIndent(4)
-        self._channels_label.setMargin(2)
-        self._channels_label.setText("ALSA Channels")
-        self.layout().addRow(self._channels_label)
-
-        self._channel_count = QSpinBox()
-        self._channel_count.setRange(1, self._channel_limit)
-        self._channel_count.valueChanged.connect(self._on_channel_count_change)
-        self.layout().addRow("Channel Count:", self._channel_count)
-
-        self._channel_start = QSpinBox()
-        self._channel_start.setRange(1, self._channel_limit)
-        self._channel_start.valueChanged.connect(self._on_channel_start_change)
-        self.layout().addRow("Start Channel:", self._channel_start)
-
-        self._channel_list = QLabel()
-        self.layout().addRow("Mapped Channels:", self._channel_list)
+        self._place_channel_widgets()
 
         # Audio Specification
-        self._spec_label = QLabel()
-        self._spec_label.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
-        self._spec_label.setIndent(4)
-        self._spec_label.setMargin(2)
-        self._spec_label.setText("Audio Specification")
-        self.layout().addRow(self._spec_label)
+        self._spec_header = GroupHeader()
+        self._spec_header.setText("Audio Specification")
+        self.layout().addRow(self._spec_header)
 
         self._spec_preset = QComboBox()
         self._spec_preset.addItem("AES67")
@@ -162,27 +124,7 @@ class SourceEditDialog(QDialog):
         self.layout().addRow("TTL:", self._ttl)
 
         # Buttons
-        self._button_box = QDialogButtonBox()
-        self._button_box.setStandardButtons(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
-        self._button_box.accepted.connect(self.submit)
-        self._button_box.rejected.connect(self.reject)
         self.layout().addRow(self._button_box)
-
-    def _on_channel_count_change(self, value):
-        value -= 1
-        self._channel_start.setMaximum(self._channel_limit - value)
-        self._update_channel_message()
-
-    def _on_channel_start_change(self, value):
-        value -= 1
-        self._channel_count.setMaximum(self._channel_limit - value)
-        self._update_channel_message()
-
-    def _update_channel_message(self):
-        start = self._channel_start.value()
-        self._channel_list.setText(
-            ", ".join([str(i + start) for i in range(self._channel_count.value())])
-        )
 
     def _on_spec_idx_change(self, idx):
         is_custom = idx == self._spec_preset.count() - 1
@@ -202,72 +144,44 @@ class SourceEditDialog(QDialog):
         self._payload_type.setValue(preset['payload_type'])
         self._ttl.setValue(preset['ttl'])
 
-    def submit(self):
-        if self._editing_id is not None:
-            stream_id = self._editing_id
-        else:
-            stream_id = max(self.parent().local_stream_ids(StreamDirection.SOURCE)) + 1
-
-        reply = make_api_put_request(
-            requests,
-            self._plugin.address,
-            'source_edit',
-            stream_id,
-            self.serialise()
-        )
-
-        if reply:
-            self.close()
-        else:
-            # todo: Implement error checking/messages
-            print(reply)
-
     def clear(self):
-        self._editing_id = None
+        super().clear()
         self.setWindowTitle("Creating New Source")
 
-        self._source_name.setText("New Source")
+        self._stream_name.setText("New Source")
         self._source_enabled.setChecked(True)
-
-        self._channel_start.setValue(1)
-        self._channel_count.setValue(2)
 
         self._spec_preset.setCurrentIndex(0)
         self._samples_per_packet.setCurrentIndex(0)
         self._ptp_traceable.setChecked(False)
 
-    def deserialise(self, source_json):
-        self._editing_id = source_json['id']
-        self.setWindowTitle(f"Editing Source '{source_json['name']}'")
+    def deserialise(self, stream_definition):
+        super().deserialise(stream_definition)
+        self.setWindowTitle(f"Editing Source '{stream_definition['name']}'")
 
         # First, determine sound protocol
-        if self._compare_preset(source_json, self._aes67_base):
+        if self._compare_preset(stream_definition, self._aes67_base):
             self._spec_preset.setCurrentIndex(0)
-        elif self._compare_preset(source_json, self._dante_base):
+        elif self._compare_preset(stream_definition, self._dante_base):
             self._spec_preset.setCurrentIndex(1)
         else:
             self._spec_preset.setCurrentIndex(self._spec_preset.count() - 1)
-            self._codec.setCurrentText(self._codecs[source_json['codec']])
-            self._dscp.setCurrentText(self._dscp_values[source_json['dscp']])
-            self._payload_type.setValue(source_json['payload_type'])
-            self._ttl.setValue(source_json['ttl'])
+            self._codec.setCurrentText(self._codecs[stream_definition['codec']])
+            self._dscp.setCurrentText(self._dscp_values[stream_definition['dscp']])
+            self._payload_type.setValue(stream_definition['payload_type'])
+            self._ttl.setValue(stream_definition['ttl'])
 
         # Second, populate things
-        self._source_enabled.setChecked(source_json['enabled'])
-        self._source_name.setText(source_json['name'])
-        self._samples_per_packet.setCurrentText(str(source_json['max_samples_per_packet']))
-        self._ptp_traceable.setChecked(source_json['refclk_ptp_traceable'])
-
-        # Third, update channel mapping
-        self._channel_start.setValue(1)
-        self._channel_count.setValue(len(source_json['map']))
-        self._channel_start.setValue(source_json['map'][0] + 1)
+        self._source_enabled.setChecked(stream_definition['enabled'])
+        self._stream_name.setText(stream_definition['name'])
+        self._samples_per_packet.setCurrentText(str(stream_definition['max_samples_per_packet']))
+        self._ptp_traceable.setChecked(stream_definition['refclk_ptp_traceable'])
 
     def serialise(self):
         start = self._channel_start.value() - 1
         return {
             "enabled": self._source_enabled.isChecked(),
-            "name": self._source_name.text(),
+            "name": self._stream_name.text(),
             "io": "Audio Device",
             "codec": self._codec.currentData(),
             "max_samples_per_packet": int(self._samples_per_packet.currentText()),
@@ -278,8 +192,8 @@ class SourceEditDialog(QDialog):
             "map": [i + start for i in range(self._channel_count.value())],
         }
 
-    def _compare_preset(self, json_data, compare_with):
+    def _compare_preset(self, stream_definition, compare_with):
         for key, value in compare_with.items():
-            if json_data[key] != value:
+            if stream_definition[key] != value:
                 return False
         return True
