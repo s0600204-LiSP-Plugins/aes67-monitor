@@ -152,6 +152,9 @@ class StreamInfoDialog(QDialog):
         else:
             return self._sink_model.localStreamIds()
 
+    def source_model(self):
+        return self._source_model
+
     def _init_source_dialog(self):
         self._source_edit_dialog = SourceEditDialog(self._plugin, parent=self)
 

@@ -22,7 +22,10 @@
 
 # pylint: disable=missing-docstring
 
+import re
+
 # pylint: disable=no-name-in-module
+from PyQt5.QtCore import QModelIndex
 from PyQt5.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -30,7 +33,7 @@ from PyQt5.QtWidgets import (
     QTextEdit,
 )
 
-from .node import StreamDirection
+from .node import StreamDataRole, StreamDirection
 from .stream_edit_dialog import StreamEditDialog
 from .ui import GroupHeader
 
@@ -66,13 +69,16 @@ class SinkEditDialog(StreamEditDialog):
 
         self._use_sdp = QCheckBox()
         self._use_sdp.setChecked(False)
-        self._use_sdp.setDisabled(True) # Temporary
         self._use_sdp.stateChanged.connect(self._on_use_sdp_pressed)
         self.layout().addRow("Manual SDP:", self._use_sdp)
 
         self._sdp_url = QLineEdit()
         self._sdp_url.setDisabled(True)
         self.layout().addRow("SDP URL:", self._sdp_url)
+
+        self._sdp_sources = QComboBox()
+        self._sdp_sources.currentIndexChanged.connect(self._on_sdp_source_select)
+        self.layout().addRow("SDP Sources:", self._sdp_sources)
 
         self._sdp_raw = QTextEdit()
         self._sdp_raw.setAcceptRichText(False)
@@ -102,11 +108,30 @@ class SinkEditDialog(StreamEditDialog):
     def _on_use_sdp_pressed(self, _):
         use_sdp = self._use_sdp.isChecked()
         self._sdp_url.setDisabled(use_sdp)
+        self._sdp_sources.setEnabled(use_sdp)
         self._sdp_raw.setEnabled(use_sdp)
         if use_sdp:
             self._sdp_url.setText("")
         else:
+            self._sdp_sources.setCurrentIndex(0)
             self._sdp_raw.setPlainText("")
+
+    def _on_sdp_source_select(self, _):
+        text = self._sdp_sources.currentData()
+        if text:
+            self._sdp_raw.setPlainText(text)
+
+    def _build_sdp_source_list(self):
+        self._sdp_sources.clear()
+        self._sdp_sources.addItem("-- Manual Entry Below --", None)
+
+        model = self.parent().source_model()
+        for source in model:
+            sdp = source.data(StreamDataRole.SDP)
+            if not sdp:
+                continue
+            name = re.search(r's=(.*)\n', sdp).group(1)
+            self._sdp_sources.addItem(name, sdp)
 
     def clear(self):
         super().clear()
@@ -115,6 +140,7 @@ class SinkEditDialog(StreamEditDialog):
         self._stream_name.setText("New Sink")
 
         self._use_sdp.setChecked(True)
+        self._build_sdp_source_list()
         self._sdp_url.setText("")
         self._sdp_raw.setText("")
 
@@ -128,8 +154,15 @@ class SinkEditDialog(StreamEditDialog):
         # Source
         self._use_sdp.setChecked(stream_definition['use_sdp'])
         self._sdp_url.setText(stream_definition['source'])
-        self._sdp_raw.setPlainText(stream_definition['sdp'])
         self._ignore_refclk_gmid.setChecked(stream_definition['ignore_refclk_gmid'])
+
+        self._build_sdp_source_list()
+        if stream_definition['use_sdp']:
+            idx = self._sdp_sources.findData(stream_definition['sdp'])
+            if idx == -1:
+                self._sdp_raw.setPlainText(stream_definition['sdp'])
+            else:
+                self._sdp_sources.setCurrentIndex(idx)
 
         # Audio Config
         self._delay.setCurrentText(str(stream_definition['delay']))

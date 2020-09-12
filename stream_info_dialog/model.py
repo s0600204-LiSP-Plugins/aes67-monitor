@@ -38,6 +38,10 @@ class StreamInfoModelTemplate(QAbstractItemModel):
         self._children_ids = []
         self.children = []
 
+    def __iter__(self):
+        for child in self.children:
+            yield child
+
     def __len__(self):
         return len(self.children)
 
@@ -155,6 +159,9 @@ class StreamInfoModelTemplate(QAbstractItemModel):
         if not index.isValid():
             return None
         return self._children_ids[self.children.index(index.internalPointer())]
+
+    def streamIds(self):
+        return self._children_ids
 
     def childCount(self, index):
         return 0 if index.isValid() else self.__len__()
