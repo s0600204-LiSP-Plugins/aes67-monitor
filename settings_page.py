@@ -22,11 +22,13 @@
 
 # pylint: disable=missing-docstring, invalid-name
 
+import netifaces as ni
+
 # pylint: disable=no-name-in-module
 from PyQt5.QtWidgets import (
+    QComboBox,
     QFormLayout,
     QGroupBox,
-    QLineEdit,
     QSpinBox,
     QVBoxLayout,
 )
@@ -46,22 +48,61 @@ class Aes67Settings(SettingsPage):
         self.settingsGroup.setLayout(QFormLayout())
         self.layout().addWidget(self.settingsGroup)
 
-        # @todo: Get a list of all available network interfaces
-        #        and their addresses and present them here
-        self._ip_input = QLineEdit()
-        self._ip_input.setInputMask('000.000.000.000')
-        self.settingsGroup.layout().addRow('IP Address:', self._ip_input)
+        self._iface_input = QComboBox()
+        self.refresh_ifaces()
+        self.settingsGroup.layout().addRow('Interface and IP Address:', self._iface_input)
 
         self._port_input = QSpinBox()
         self._port_input.setRange(1000, 9000)
-        self.settingsGroup.layout().addRow('IP Address:', self._port_input)
+        self.settingsGroup.layout().addRow('Port Number:', self._port_input)
+
+    def refresh_ifaces(self):
+        self._iface_input.clear()
+        for iface in ni.interfaces():
+            try:
+                for addr in ni.ifaddresses(iface)[ni.AF_INET]:
+                    addr = addr['addr']
+                    self._iface_input.addItem(f"{iface}: {addr}", (iface, addr))
+            except KeyError:
+                continue
+
+    def update_iface(self, iface, ip):
+        '''
+        Sets a suitable index in the combobox.
+
+        If the supplied interface doesn't exist, or doesn't have IPv4 addresses,
+        we fallback to the first interface and IPv4 address in the list.
+
+        If the supplied interface exists, but doesn't have the stored IPv4 address,
+        we fallback to that interface, but use the first IPv4 address that it has.
+        '''
+        iface_fallback = None
+        for idx in range(self._iface_input.count()):
+            entry = self._iface_input.itemData(idx)
+
+            if entry[0] != iface:
+                continue
+
+            if entry[1] == ip:
+                self._iface_input.setCurrentIndex(idx)
+                return
+
+            if not iface_fallback:
+                iface_fallback = idx
+
+        if iface_fallback:
+            self._iface_input.setCurrentIndex(iface_fallback)
+        else:
+            self._iface_input.setCurrentIndex(0)
 
     def getSettings(self):
+        iface = self._iface_input.currentData()
         return {
-            'daemon_ip': self._ip_input.text(),
+            'daemon_iface': iface[0],
+            'daemon_ip': iface[1],
             'daemon_port': self._port_input.value(),
         }
 
     def loadSettings(self, settings):
-        self._ip_input.setText(settings['daemon_ip'])
+        self.update_iface(settings['daemon_iface'], settings['daemon_ip'])
         self._port_input.setValue(settings['daemon_port'])

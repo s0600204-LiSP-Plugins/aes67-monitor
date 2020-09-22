@@ -1,6 +1,7 @@
 {
-  "_version_": "0.1",
+  "_version_": "0.2",
   "_enabled_": true,
   "daemon_ip": "127.0.0.1",
+  "daemon_iface": "lo",
   "daemon_port": 8080
 }

@@ -25,6 +25,7 @@
 import requests
 
 from lisp.core.clock import Clock
+from lisp.core.decorators import async_function
 
 from .util import API_PATHS, make_api_get_request
 
@@ -67,6 +68,7 @@ class DaemonPoller:
             self._clock.remove_callback(self.run)
             self._clock_started = False
 
+    @async_function
     def run(self):
         with requests.Session() as session:
             address = self._plugin.address
