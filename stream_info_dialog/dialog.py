@@ -69,8 +69,12 @@ class StreamInfoDialog(QDialog):
         self._plugin.poller.remove_callback('remote_sources', self.update_remote_sources)
 
     def update_local_streams(self, stream_definitions):
+        if not stream_definitions:
+            return
         self._sources.update_local_streams(stream_definitions['sources'])
         self._sinks.update_local_streams(stream_definitions['sinks'])
 
     def update_remote_sources(self, stream_definitions):
+        if not stream_definitions:
+            return
         self._sources.update_remote_streams(stream_definitions['remote_sources'])
