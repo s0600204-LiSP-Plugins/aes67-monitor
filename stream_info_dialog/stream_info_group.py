@@ -2,10 +2,10 @@
 # licence as - Linux Show Player
 #
 # Linux Show Player:
-#   Copyright 2012-2020 Francesco Ceruti <ceppofrancy@gmail.com>
+#   Copyright 2012-2021 Francesco Ceruti <ceppofrancy@gmail.com>
 #
 # This file:
-#   Copyright 2020 s0600204
+#   Copyright 2021 s0600204
 #
 # Linux Show Player is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
