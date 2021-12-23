@@ -22,6 +22,8 @@
 
 # pylint: disable=missing-docstring
 
+from math import trunc
+
 # pylint: disable=no-name-in-module
 from PyQt5.QtCore import QRect, Qt
 from PyQt5.QtWidgets import QApplication, QStyle, QStyledItemDelegate, QStyleOptionFocusRect
@@ -66,14 +68,14 @@ class StreamInfoDelegate(QStyledItemDelegate):
             self.margin,
             self.margin,
             self.margin,
-            -h / 2 - self.margin
+            trunc(-h / 2) - self.margin
         )
         painter.drawText(name_rect, Qt.AlignVCenter, index.model().data(index, StreamDataRole.NAME))
 
         ch_rect = QRect(option.rect)
         ch_rect.adjust(
             self.margin,
-            h / 2 + self.margin,
+            trunc(h / 2) + self.margin,
             -self.margin,
             -self.margin
         )
@@ -82,8 +84,8 @@ class StreamInfoDelegate(QStyledItemDelegate):
         if index.internalPointer().data(StreamDataRole.DIRECTION) == StreamDirection.SOURCE:
             info_rect = QRect(option.rect)
             info_rect.adjust(
-                w / 2 + self.margin,
-                h / 2 + self.margin,
+                trunc(w / 2) + self.margin,
+                trunc(h / 2) + self.margin,
                 -self.margin,
                 -self.margin
             )
